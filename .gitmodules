@@ -1,0 +1,3 @@
+[submodule "mysql2sqlite"]
+	path = mysql2sqlite
+	url = https://github.com/mysql2sqlite/mysql2sqlite.git

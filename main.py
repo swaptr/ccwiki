@@ -2,6 +2,7 @@ import os
 import gzip
 import re
 import requests
+import subprocess
 
 import pandas as pd
 import xml.etree.ElementTree as ET
@@ -16,7 +17,7 @@ def download_one(id):
     url = info["item_href"]
     file_name = info["file_name"]
     file_location = os.path.join(location, file_name)
-    ext_location = os.path.join(location, id)
+    ext_location = os.path.join(location, f"{id}.sql")
 
     response = requests.get(url, stream=True)
     total_size = int(response.headers.get('content-length', 0))
@@ -87,8 +88,31 @@ def download_all(languages = get_list_of_languages()):
         print(f"{index + 1}/{len(languages)}")
         download_one(language)
 
+def convert_to_sqlite(id):
+    mysql2sqlite_script = './mysql2sqlite/mysql2sqlite'
+    sql_file_path = f"./files/{id}.sql"
+    sqlite_db_path = f"./files/{id}.db"
+    
+    command = [mysql2sqlite_script, sql_file_path]
+
+    try:
+        print(f"Converting hi: {sql_file_path}")
+        subprocess.run(command, stdout=subprocess.PIPE, check=True)
+        
+        sqlite_command = ['sqlite3', sqlite_db_path]
+        
+        with subprocess.Popen(command, stdout=subprocess.PIPE) as mysql_process:
+            with subprocess.Popen(sqlite_command, stdin=mysql_process.stdout) as sqlite_process:
+                sqlite_process.wait()
+        
+        print(f"Converted hi: {sqlite_db_path}")
+    
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred: {e}")
+
 if __name__ == "__main__":
     os.makedirs(location, exist_ok=True)
 
     # download_all()
-    download_one("hi")
+    # download_one("hi")
+    convert_to_sqlite("hi")

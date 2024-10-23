@@ -12,6 +12,8 @@ from tqdm import tqdm
 location = "./files"
 
 def download_one(id):
+    """Download database dump for a single language wiki.
+    """
     chunk_size = 1024
     info = get_info_for_id(id)
     url = info["item_href"]
@@ -42,10 +44,14 @@ def download_one(id):
                     pbar.update(len(chunk))
 
 def get_list_of_languages():
+    """Returns list of language wikis.
+    """
     df = pd.read_html("https://meta.wikimedia.org/wiki/List_of_Wikipedias")[0]
     return list(df["Wiki"].str.replace("-", "_"))
 
 def get_info_for_id(id: str):
+    """Returns information from the RSS feed for a language.
+    """
     try:
         response = requests.get(
             f'https://dumps.wikimedia.org/{id}wiki/latest/{id}wiki-latest-externallinks.sql.gz-rss.xml',
@@ -84,11 +90,20 @@ def get_info_for_id(id: str):
         return {"error": f"An unexpected error occurred: {str(e)}"}
 
 def download_all(languages = get_list_of_languages()):
+    """Download all languages and extract the MySQL database dump.
+    
+    Accepts a list of languages to download. By default, it downloads all available languages.
+    """
+
     for index, language in enumerate(languages):
         print(f"{index + 1}/{len(languages)}")
         download_one(language)
 
 def convert_to_sqlite(id):
+    """Transforms a MySQL dump into a SQLite database.
+    
+    Please ensure that you have properly configured and updated the git submodules.
+    """
     mysql2sqlite_script = './mysql2sqlite/mysql2sqlite'
     sql_file_path = f"./files/{id}.sql"
     sqlite_db_path = f"./files/{id}.db"
@@ -114,5 +129,5 @@ if __name__ == "__main__":
     os.makedirs(location, exist_ok=True)
 
     # download_all()
-    # download_one("hi")
-    convert_to_sqlite("hi")
+    download_one("st")
+    convert_to_sqlite("st")

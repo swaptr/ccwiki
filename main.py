@@ -7,10 +7,94 @@ import subprocess
 import pandas as pd
 import xml.etree.ElementTree as ET
 
+from io import StringIO
 from tqdm import tqdm
 
 location = "./files"
 
+def get_iso_languages_df():
+    """Fetches the latest ISO-639-3 language codes."""
+    response = requests.get("https://iso639-3.sil.org/sites/iso639-3/files/downloads/iso-639-3_Name_Index.tab")
+
+    if response.status_code == 200:
+        data = StringIO(response.content.decode('utf-8'))
+        return pd.read_csv(data, sep='\t', encoding='utf-8')
+    else:
+        print(f"Failed to retrieve data: {response.status_code}")
+        return None
+
+def generate_iso_code_wiki_csv():
+    """Generates a CSV file with ISO-639-3 language codes."""
+    iso_df = get_iso_languages_df()
+    lang_df = pd.read_html("https://meta.wikimedia.org/wiki/List_of_Wikipedias")[0][["Language", "Wiki"]]
+    found = []
+    not_found = []
+    conflicts = []
+    for _, lang in lang_df.iterrows():
+        if len(lang.Wiki) == 3:
+            iso_match_df = iso_df[iso_df["Id"] == lang.Wiki]
+            match len(iso_match_df):
+                case 0:
+                    not_found.append({
+                        "wiki_code": lang.Wiki,
+                        "wiki_name": lang.Language,
+                        "iso_code": None,
+                        "iso_name": None
+                    })
+                case 1:
+                    found.append({
+                        "wiki_code": lang.Wiki,
+                        "wiki_name": lang.Language,
+                        "iso_code": iso_match_df.Id.iloc[0],
+                        "iso_name": iso_match_df.Print_Name.iloc[0]
+                    })
+                case _:
+                    lang_match_df = iso_df[iso_df["Print_Name"] == lang.Language]
+                    match len(lang_match_df):
+                        case 0:
+                            conflicts.append({
+                                "wiki_code": lang.Wiki,
+                                "wiki_name": lang.Language,
+                                "conflicts": iso_match_df.Print_Name.tolist()
+                            })
+                        case 1:
+                            found.append({
+                                "wiki_code": lang.Wiki,
+                                "wiki_name": lang.Language,
+                                "iso_code": lang_match_df.Id.iloc[0],
+                                "iso_name": lang_match_df.Print_Name.iloc[0]
+                            })
+                        case _:
+                            conflicts.append({
+                                "wiki_code": lang.Wiki,
+                                "wiki_name": lang.Language,
+                                "conflicts": lang_match_df.Print_Name.tolist()
+                            })
+        else:
+            lang_match_df = iso_df[iso_df["Print_Name"] == lang.Language]
+            match len(lang_match_df):
+                case 0:
+                    not_found.append({
+                        "wiki_code": lang.Wiki,
+                        "wiki_name": lang.Language,
+                        "iso_code": None,
+                        "iso_name": None
+                    })
+                case 1:
+                    found.append({
+                        "wiki_code": lang.Wiki,
+                        "wiki_name": lang.Language,
+                        "iso_code": lang_match_df.Id.iloc[0],
+                        "iso_name": lang_match_df.Print_Name.iloc[0]
+                    })
+                case _:
+                    conflicts.append({
+                        "wiki_code": lang.Wiki,
+                        "wiki_name": lang.Language,
+                        "conflicts": lang_match_df.Print_Name.tolist()
+                    })
+
+    pd.DataFrame(found).to_csv(f"./{location}/iso_languages.csv", index=None)
 
 def download_one(id):
     """Download database dump for a single language wiki."""
@@ -138,5 +222,6 @@ if __name__ == "__main__":
     os.makedirs(location, exist_ok=True)
 
     # download_all()
-    download_one("st")
-    convert_to_sqlite("st")
+    # download_one("st")
+    # convert_to_sqlite("st")
+    # generate_iso_code_wiki_csv()
